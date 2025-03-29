@@ -1,15 +1,15 @@
 from bed import Bed
 from patient import Patient
-from reward import calculate_reward
 class HospitalBedEnv(): 
     def __init__(self, config):
         self.config = config 
 
         self.curr_time = 0 
         self.curr_episode = 0
+        self.episode_steps = 0 
         self.max_steps = config.get('max_episode_steps', 1000)
 
-        self.patients = [] #check
+        self.patients = {} #check
         self.beds = self._initialize_beds(config['beds_config']) #check
         self.patient_queue = []
         self.current_patient = None
@@ -23,15 +23,16 @@ class HospitalBedEnv():
     def reset(self): 
         self.curr_time = 0 
         self.curr_episode = 0
+        self.episode_steps = 0 
 
         for beds in self.beds: #check
             beds.reset() 
 
-        self.patients = []
+        self.patients = {}
         self.patient_queue = []
-        self._generate_initial_patients()#check 
+        self.patient_queue.append(Patient(self.curr_time)) #add 1 patient 
 
-        return self._get_state()#check
+        return self.get_state()#check
     
     def step(self, action):
         """
@@ -43,8 +44,8 @@ class HospitalBedEnv():
             reward = self._handle_wait_action() #check
         else: 
             bed_idx = action - 1 #bed id from 0 to N
-            if bed_idx < len(self.beds) and self.beds[bed_idx].is_available():
-                reward = self._handle_assignment_action(bed_idx) #check
+            if bed_idx < len(self.beds) and not self.beds[bed_idx].is_occupied():
+                reward = self.handle_assignment_action(bed_idx) #check
             else:
                 print("No beds are available/Bed id is invalid")
                 reward = self.config.get('invalid_action_penalty', -10) #potentially alter this penalty(lower)
@@ -62,7 +63,7 @@ class HospitalBedEnv():
         done = self.episode_steps >= self.max_steps
         
         # Get new state
-        next_state = self._get_state()
+        next_state = self.get_state()
         
         # Gather info
         info = self._get_info()
@@ -80,7 +81,7 @@ class HospitalBedEnv():
             # No patient in queue - use zeros
             patient_features = [0] * self.config.get('patient_feature_dim', 5)
 
-        available_beds = [bed for bed in self.beds if bed.is_available()]
+        available_beds = [bed for bed in self.beds if not bed.is_occupied()]
         bed_features = [bed.get_features() for bed in available_beds]
 
         #BIG BIG CHECK Pad or truncate bed features to fixed size if needed 
@@ -105,9 +106,9 @@ class HospitalBedEnv():
         Return additional information about current environment state.
         """
         return {
-            'current_time': self.current_time,
+            'current_time': self.curr_time,
             'queue_length': len(self.patient_queue),
-            'occupied_beds': sum(1 for bed in self.beds if not bed.is_available()),
+            'occupied_beds': sum(1 for bed in self.beds if bed.is_occupied()),
             'avg_wait_time': sum(self.stats['wait_times']) / max(1, len(self.stats['wait_times']))
         }
     
@@ -117,12 +118,6 @@ class HospitalBedEnv():
         beds = [Bed(bed_id=i) for i in range(len(beds_config))]
         return beds
 
-    def _generate_initial_patients(self):
-        """Generate initial set of patients to populate the queue."""
-        num_initial = self.config.get('num_initial_patients')
-        for i in range(num_initial):
-            patient = Patient()
-            self.patient_queue.append(patient)
 
     def _handle_wait_action(self):
         """Process a wait action for the current patient."""
@@ -130,8 +125,9 @@ class HospitalBedEnv():
             # Calculate wait penalty based on severity
             # wait_penalty = -self.config.get('wait_penalty_factor', 0.1) * self.current_patient.severity
             self.current_patient.increase_wait_time()
-            # return wait_penalty
-        # return 0
+            wait_penalty = -1 #subject to change
+            return wait_penalty
+        return 0
 
     def handle_assignment_action(self, bed_idx):
         """Process a bed assignment action."""
@@ -153,13 +149,16 @@ class HospitalBedEnv():
         
         # Total reward
         # total_reward = mm_reward + wt_reward + dp_reward
-        total_reward += calculate_reward(self.get_state(), len(self.patients))
+        total_reward = 0
+        total_reward += self.calculate_reward(self.get_state(), len(self.patients))
         
         # Track stats
         # self.stats['wait_times'].append(self.current_patient.wait_time)
         # self.stats['specialty_matches'].append(specialty_match)
         
         # Assign patient to bed
+
+        self.patients[self.current_patient.id] = self.current_patient
         bed.assign_patient(self.current_patient)
         
         # Clear current patient to get next one
@@ -167,6 +166,38 @@ class HospitalBedEnv():
         
         return total_reward
     
+    def calculate_reward(self, state, occupancy, action=None, next_state=None): 
+        """
+        Returns reward 
+        """
+        if action == 0: 
+            patient_features = state['patient']
+            severity = patient_features[0]  # Assuming severity is first feature
+            return -self.config.get('wait_penalty_factor', 0.1) * severity
+
+        if 1 <= action <= len(self.beds):
+            bed_idx = action - 1
+            bed = self.beds[bed_idx]
+            
+            # patient_features = state['patient']
+            # severity = patient_features[0]
+            # condition = patient_features[2]  # Assuming condition is third feature
+            # wait_time = patient_features[3]  # Assuming wait time is fourth feature
+            
+            # # Medical Match (MM)
+            # mm = -5 if condition != bed.specialization else 0
+            
+            # # Wait Time Consideration (WT)
+            # wt = -0.2 * wait_time
+            
+            # # Distance/Monitoring Penalty (DP)
+            # dp = -1 * (severity / 10) * (1 / bed.monitoring_capability)
+            
+            # return mm + wt + dp
+            return (occupancy / len(state['beds'])) * 3
+        
+        # Invalid action
+        return self.config.get('invalid_action_penalty')
 
     def _advance_time(self):
         """
@@ -177,7 +208,7 @@ class HospitalBedEnv():
         """
         # Time step size - can be fixed or variable
         time_step = self.config.get('time_step')
-        self.current_time += time_step
+        self.curr_time += time_step
         
         events = []
         
@@ -193,16 +224,16 @@ class HospitalBedEnv():
         #     })
         events.append({
             'type': 'patient_arrival',
-            'time': self.current_time
+            'time': self.curr_time
         })
 
         # Check for bed discharges
         for bed in self.beds:
-            if not bed.is_available() and bed.expected_discharge_time <= self.current_time:
+            if bed.is_occupied() and bed.time_occupied >= bed.occupancy_delta:
                 events.append({
                     'type': 'bed_discharge',
                     'bed_id': bed.bed_id,
-                    'time': self.current_time
+                    'time': self.curr_time
                 })
         
         return events
@@ -212,10 +243,16 @@ class HospitalBedEnv():
         for event in events:
             if event['type'] == 'patient_arrival':
                 # new_patient = Patient.generate_random(self.current_time, self.config)
-                self.patient_queue.append(Patient())
+                new_patient = Patient(self.curr_time)
+                self.patient_queue.append(new_patient)
             elif event['type'] == 'bed_discharge':
                 bed_id = event['bed_id']
+
+                # store deletion id because otherwise cannot reference patient because already gone
+                deletion_id = self.beds[bed_id].current_patient.id
+
                 self.beds[bed_id].discharge_patient()
+                del self.patients[deletion_id]
 
     def _get_arrival_rate(self, time):
         """
@@ -229,15 +266,17 @@ class HospitalBedEnv():
         """
         # Implement time-dependent arrival rates
         # Example: Higher rates during day, lower at night
-        base_rate = self.config.get('base_arrival_rate', 0.1)
+        # base_rate = self.config.get('base_arrival_rate', 0.1)
         
-        # Assume time is in hours and create daily cycle
-        hour_of_day = (time % 24)
+        # # Assume time is in hours and create daily cycle
+        # hour_of_day = (time % 24)
         
-        # More arrivals during day (8am-8pm)
-        if 8 <= hour_of_day <= 20:
-            return base_rate * 1.5
-        else:
-            return base_rate * 0.5
+        # # More arrivals during day (8am-8pm)
+        # if 8 <= hour_of_day <= 20:
+        #     return base_rate * 1.5
+        # else:
+        #     return base_rate * 0.5
     
+        base_rate = self.config.get("base_arrival_rate")
+        return base_rate
     
