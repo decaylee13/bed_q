@@ -9,7 +9,7 @@ class HospitalBedEnv():
         self.episode_steps = 0 
         self.max_steps = config.get('max_episode_steps', 1000)
 
-        self.patients = {} #check
+        self.patients = {} 
         self.beds = self._initialize_beds(config['beds_config']) #check
         self.patient_queue = []
         self.current_patient = None
@@ -30,7 +30,7 @@ class HospitalBedEnv():
 
         self.patients = {}
         self.patient_queue = []
-        self.patient_queue.append(Patient(self.curr_time)) #add 1 patient 
+        self.current_patient = Patient(self.curr_time)
 
         return self.get_state()#check
     
@@ -38,22 +38,24 @@ class HospitalBedEnv():
         """
         Process an action and return the next state, reward, and done flag.
         """
-        reward = 0
-        
+
+        # Register model's desired action assignments and also do validation on actions
+        bed_idx = action - 1 
         if action == 0:  
-            reward = self._handle_wait_action() #check
-        else: 
-            bed_idx = action - 1 #bed id from 0 to N
+            self._handle_wait_action()
+        else:
             if bed_idx < len(self.beds) and not self.beds[bed_idx].is_occupied():
-                reward = self.handle_assignment_action(bed_idx) #check
+                self.handle_assignment_action(bed_idx,action) #check
             else:
                 print("No beds are available/Bed id is invalid")
-                reward = self.config.get('invalid_action_penalty', -10) #potentially alter this penalty(lower)
+
+        # Register creation of new events and enact them (patient arrival & discharge)
+        self._advance_time()
         
-        #BIG CHECK Advance time and process events 
-        events = self._advance_time()
-        self._process_events(events)
-        
+        # Update rewards
+        print("Current occupancy count:",len(self.patients))
+        reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
+
         # Update current patient if needed
         if self.current_patient is None and self.patient_queue:
             self.current_patient = self.patient_queue.pop(0)
@@ -65,7 +67,7 @@ class HospitalBedEnv():
         # Get new state
         next_state = self.get_state()
         
-        # Gather info
+        # Gather statistical info
         info = self._get_info()
         
         return next_state, reward, done, info
@@ -125,79 +127,53 @@ class HospitalBedEnv():
             # Calculate wait penalty based on severity
             # wait_penalty = -self.config.get('wait_penalty_factor', 0.1) * self.current_patient.severity
             self.current_patient.increase_wait_time()
-            wait_penalty = -1 #subject to change
-            return wait_penalty
-        return 0
+            # wait_penalty = -1 #subject to change
+            # return wait_penalty
+        # return 0
 
-    def handle_assignment_action(self, bed_idx):
+    def handle_assignment_action(self, bed_idx, action):
         """Process a bed assignment action."""
-        if not self.current_patient:
-            return self.config.get('invalid_action_penalty', -10)
-        
-        bed = self.beds[bed_idx]
-        
-        # Calculate reward components as per your document
-        # Medical Match (MM)
-        # specialty_match = 1 if self.current_patient.condition_type == bed.specialization else 0
-        # mm_reward = 0 if specialty_match else -5  # -5 penalty for mismatch
-        
-        # Wait Time Consideration (WT)
-        # wt_reward = -0.2 * self.current_patient.wait_time
-        
-        # Distance/Monitoring Penalty (DP)
-        # dp_reward = -1 * (self.current_patient.severity / 10) * (1 / bed.monitoring_capability)
-        
-        # Total reward
-        # total_reward = mm_reward + wt_reward + dp_reward
-        total_reward = 0
-        total_reward += self.calculate_reward(self.get_state(), len(self.patients))
-        
-        # Track stats
-        # self.stats['wait_times'].append(self.current_patient.wait_time)
-        # self.stats['specialty_matches'].append(specialty_match)
-        
-        # Assign patient to bed
-
-        self.patients[self.current_patient.id] = self.current_patient
-        bed.assign_patient(self.current_patient)
-        
-        # Clear current patient to get next one
-        self.current_patient = None
-        
-        return total_reward
+        if action != 0:
+            bed = self.beds[bed_idx]
+            self.patients[self.current_patient.id] = self.current_patient # reference the patient's existing ID
+            bed.assign_patient(self.current_patient)
+            # Clear current patient to get next one
+            self.current_patient = None
     
-    def calculate_reward(self, state, occupancy, action=None, next_state=None): 
+    def calculate_reward(self, occupancy, action, bed_idx): 
         """
         Returns reward 
         """
-        if action == 0: 
-            patient_features = state['patient']
-            severity = patient_features[0]  # Assuming severity is first feature
-            return -self.config.get('wait_penalty_factor', 0.1) * severity
+        reward = 0 
 
-        if 1 <= action <= len(self.beds):
-            bed_idx = action - 1
-            bed = self.beds[bed_idx]
-            
-            # patient_features = state['patient']
-            # severity = patient_features[0]
-            # condition = patient_features[2]  # Assuming condition is third feature
-            # wait_time = patient_features[3]  # Assuming wait time is fourth feature
-            
-            # # Medical Match (MM)
-            # mm = -5 if condition != bed.specialization else 0
-            
-            # # Wait Time Consideration (WT)
-            # wt = -0.2 * wait_time
-            
-            # # Distance/Monitoring Penalty (DP)
-            # dp = -1 * (severity / 10) * (1 / bed.monitoring_capability)
-            
-            # return mm + wt + dp
-            return (occupancy / len(state['beds'])) * 3
+        if action!=0:
+            print("is the bed of the desired action occupied?")
+            # print("bed_idx's patient (if any)",self.beds[bed_idx].current_patient)
+            # print(not (self.beds[bed_idx].is_occupied()))
+            if self.beds[bed_idx].current_patient != None:
+                print("Occupied")
+                print(self.beds[bed_idx].current_patient)
+            else:
+                print("Nobody")
+                print(self.beds[bed_idx].current_patient)
+    
+        if action == 0: 
+            # if making a patient wait
+            reward -= self.config.get('wait_penalty_factor', 0.1) 
+
+        elif bed_idx < self.config.get('max_beds_in_state') and not self.beds[bed_idx].is_occupied():
+            # if a valid action
+            reward += self.config.get('valid_bed_assnmt')
+
+            # update the occupancy reward
+            reward += (occupancy / self.config('max_beds_in_state')) * 10
+        else:
+            # Discourage it from doing illegal actions
+            reward -= self.config.get('invalid_action_penalty')
+            print("Incurred invalid action reward",self.curr_time)
         
-        # Invalid action
-        return self.config.get('invalid_action_penalty')
+        
+        return reward
 
     def _advance_time(self):
         """
@@ -236,10 +212,6 @@ class HospitalBedEnv():
                     'time': self.curr_time
                 })
         
-        return events
-
-    def _process_events(self, events):
-        """Process the events that occurred during time advancement."""
         for event in events:
             if event['type'] == 'patient_arrival':
                 # new_patient = Patient.generate_random(self.current_time, self.config)
@@ -250,7 +222,6 @@ class HospitalBedEnv():
 
                 # store deletion id because otherwise cannot reference patient because already gone
                 deletion_id = self.beds[bed_id].current_patient.id
-
                 self.beds[bed_id].discharge_patient()
                 del self.patients[deletion_id]
 

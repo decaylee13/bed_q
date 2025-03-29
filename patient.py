@@ -1,5 +1,8 @@
 class Patient: 
     def __init__(self, id):
+
+        # NOTE: how long a patient has been waiting while being treated is stored by their bed owner
+
         self.wait_time = 0
         self.status = None #waiting, in bed, out of bed
         self.id = id
