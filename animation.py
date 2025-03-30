@@ -493,7 +493,7 @@ class HospitalSimulation:
 
         # Draw strategy title
         strategy_font = pygame.font.Font(None, 24)
-        title = strategy_font.render(f"{self.allocation_strategy.upper()} STRATEGY", True, BLACK)
+        title = strategy_font.render(f"{self.allocation_strategy.upper()}", True, BLACK)
         title_rect = title.get_rect(center=(self.window_width//2, 20))
         surface.blit(title, title_rect)
 
