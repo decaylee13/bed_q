@@ -1,4 +1,5 @@
 import time 
+import random
 
 class Bed: 
     def __init__(self, bed_id, efficiency):
@@ -11,18 +12,13 @@ class Bed:
     def time_occupied_increase(self, time_increment = 1):
         self.time_occupied += time_increment
 
-    #Update later
-    def calc_occupancy(self): 
-        self.occupancy_delta = 2 * (self.current_patient.severity**1.8) / self.efficiency
-
     def assign_patient(self, patient):
         """Assign a patient to this bed."""
         if self.current_patient:
             raise ValueError("Attempting to assign patient to an unavailable bed")
     
         self.current_patient = patient
-
-        self.calc_occupancy()
+        self.occupancy_delta = 15*(patient.severity**2) / (self.efficiency)
         
     def discharge_patient(self):
         """Discharge the current patient and make bed available."""
@@ -44,6 +40,4 @@ class Bed:
         """Reset the bed to initial state."""
         self.current_patient = None
         self.time_occupied = 0
-        self.occupancy_delta = 0
-
-
+        self.occupancy_delta = 5
