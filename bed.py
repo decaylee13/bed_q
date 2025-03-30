@@ -13,7 +13,7 @@ class Bed:
 
     #Update later
     def calc_occupancy(self): 
-        self.occupancy_delta = 8 * (self.current_patient.severity**1.8) / self.efficiency
+        self.occupancy_delta = 2 * (self.current_patient.severity**1.8) / self.efficiency
 
     def assign_patient(self, patient):
         """Assign a patient to this bed."""

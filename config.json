@@ -154,7 +154,7 @@
   "environment_parameters": {
     "max_episode_steps": 600,
     "patient_feature_dim": 2,
-    "max_beds_in_state": 50,
+    "max_beds_in_state": 25,
     "bed_feature_dim": 4,
     "valid_bed_asnmt": 1.5,
     "invalid_action_penalty": 5,
@@ -163,15 +163,15 @@
     "wait_penalty_factor": 0.4
   },
   "learning_parameters": {
-    "learning_rate": 0.0001,
+    "learning_rate": 0.001,
     "gamma": 0.95,
     "epsilon_start": 1.0,
     "epsilon_end": 0.01,
     "epsilon_decay": 0.9995,
     "target_update": 300,
     "replay_buffer_size": 100000,
-    "batch_size": 128,
-    "num_episodes": 200,
-    "max_steps": 300
+    "batch_size": 256,
+    "num_episodes": 100,
+    "max_steps": 400
   }
 }
