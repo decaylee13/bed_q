@@ -10,7 +10,7 @@ class HospitalBedEnv():
         self.max_steps = self.config.get('max_episode_steps', 1000)
 
         self.patients = {} 
-        self.beds = self._initialize_beds(config['beds_config']) #check
+        self.beds = self._initialize_beds(config['beds_config']) 
         self.patient_queue = []
         self.current_patient = None
         

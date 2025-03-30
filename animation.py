@@ -259,8 +259,7 @@ class HospitalSimulation:
 
         self.next_patient_arrival = self.current_time + PATIENT_ARRIVAL_INTERVAL
 
-    def process_optimal_allocation(self):
-        """Optimal allocation strategy assigning highest-severity patients to highest-efficiency beds."""
+    def process_RL_allocation(self):
         # Get all available beds sorted by efficiency descending
         available_beds = [bed for bed in self.beds if not bed.is_occupied()]
         if not available_beds:
@@ -458,7 +457,7 @@ class HospitalSimulation:
         if self.allocation_strategy == 'FIFO Agent':
             self.process_fifo_allocation()
         else:
-            self.process_optimal_allocation()
+            self.process_RL_allocation()
             
         self.process_discharges()
         self.update_patient_positions(dt)
