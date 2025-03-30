@@ -118,10 +118,35 @@ class HospitalBedEnv():
         }
     
     #Environmental Helper Methods: 
+    # def _initialize_beds(self, beds_config):
+    #     """Initialize bed objects based on configuration."""
+    #     beds = [Bed(bed_id=i) for i in range(len(beds_config))]
+    #     return beds
     def _initialize_beds(self, beds_config):
         """Initialize bed objects based on configuration."""
-        beds = [Bed(bed_id=i) for i in range(len(beds_config))]
+        beds = []
+        total_beds = len(beds_config)
+        
+        low_count = int(total_beds * 0.7)
+        medium_count = int(total_beds * 0.2)
+
+        for i in range(low_count):
+            eff = 1 + (i%5)
+            new_bed = Bed(bed_id = i, efficiency = eff)
+            beds.append(new_bed)
+        
+        for i in range(low_count, low_count + medium_count):
+            eff = 6 + (i % 3)
+            new_bed = Bed(bed_id = i, efficiency = eff)
+            beds.append(new_bed)
+
+        for i in range(low_count + medium_count, total_beds):
+            eff = 9 + (i % 2)
+            new_bed = Bed(bed_id=i, efficiency=eff)
+            beds.append(new_bed)
+        
         return beds
+
 
 
     def _handle_wait_action(self):
