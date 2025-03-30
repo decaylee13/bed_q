@@ -76,25 +76,25 @@
       "id": 24
     }
   ],
-  "max_beds_in_state": 25,
-  "max_episode_steps": 75,
+  "max_beds_in_state": 50,
+  "max_episode_steps": 350,
   "time_step": 1,
   "base_arrival_rate": 0.3,
   "wait_penalty_factor": 0.2,
-  "invalid_action_penalty": 2,
+  "invalid_action_penalty": 5,
   "patient_feature_dim": 1,
   "bed_feature_dim": 3,
   "valid_bed_asnmt": 1,
   "learning_parameters": {
     "learning_rate": 0.0001,
-    "gamma": 0.8,
+    "gamma": 0.95,
     "epsilon_start": 1.0,
     "epsilon_end": 0.01,
-    "epsilon_decay": 0.991,
+    "epsilon_decay": 0.985,
     "target_update": 300,
-    "replay_buffer_size": 50000,
-    "batch_size": 32,
-    "num_episodes": 100,
-    "max_steps": 75
+    "replay_buffer_size": 100000,
+    "batch_size": 128,
+    "num_episodes": 200,
+    "max_steps": 300
   }
 }

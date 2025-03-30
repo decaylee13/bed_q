@@ -9,7 +9,7 @@ from torch.cuda.amp import autocast, GradScaler
 from collections import deque
 
 # Check if CUDA is available
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 class ReplayBuffer:
     def __init__(self, capacity=50000):
@@ -371,7 +371,7 @@ def train_dqn(env, agent, num_episodes, max_steps, batch_size=32, checkpoint_int
             episode_reward += reward
             
             # Train agent
-            # agent.train(batch_size)  # This would be implemented later
+            agent.train(batch_size)  # This would be implemented later
             
             # For now, manually update steps
             agent.steps_done += 1
