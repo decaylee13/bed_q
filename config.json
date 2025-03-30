@@ -153,9 +153,9 @@
   ],
   "environment_parameters": {
     "max_episode_steps": 350,
-    "patient_feature_dim": 1,
+    "patient_feature_dim": 2,
     "max_beds_in_state": 50,
-    "bed_feature_dim": 3,
+    "bed_feature_dim": 4,
     "valid_bed_asnmt": 1,
     "invalid_action_penalty": 5,
     "time_step": 1,

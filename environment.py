@@ -120,7 +120,11 @@ class HospitalBedEnv():
     #Environmental Helper Methods: 
     def _initialize_beds(self, beds_config):
         """Initialize bed objects based on configuration."""
-        beds = [Bed(bed_id=i) for i in range(len(beds_config))]
+        beds = []
+        for i in range(len(beds_config)):
+            eff = (i%10) + 1
+            new_bed = Bed(bed_id=i, efficiency= eff)
+            beds.append(new_bed)
         return beds
 
 
