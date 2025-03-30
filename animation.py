@@ -4,10 +4,6 @@ import random
 from collections import deque
 from typing import List, Tuple, Optional, Dict
 
-# Import the existing classes (assuming they're in the same directory)
-from patient import Patient
-from bed import Bed
-
 # Window size
 WINDOW_WIDTH = 1200
 WINDOW_HEIGHT = 900
@@ -36,14 +32,78 @@ ROOM_SPACING = 20
 
 # Simulation parameters
 PATIENT_ARRIVAL_INTERVAL = 0.6  # seconds
-BASE_MOVE_SPEED = 1000.0        # pixels per second
+BASE_MOVE_SPEED = 600        # pixels per second
 TOTAL_PATIENTS = 100
 
-class HospitalSimulation:
-    """Simulation of hospital bed allocation using FIFO policy."""
+class Patient: 
+    def __init__(self, id, severity=None):
+        self.id = id
+        self.wait_time = 0
+        if severity is not None:
+            self.severity = severity
+        else:
+            if random.random() < 0.7:
+                self.severity = random.randint(1, 5)
+            else:
+                self.severity = random.randint(6, 10)
+        self.status = "entering"
     
-    def __init__(self, num_beds: int = 24):
+    def increase_wait_time(self, time_increment=1):
+        self.wait_time += time_increment
+
+    def get_features(self):
+        return [self.wait_time, self.severity]
+
+class Bed: 
+    def __init__(self, bed_id, efficiency, allocation_strategy):
+        self.bed_id = bed_id
+        self.efficiency = efficiency
+        self.time_occupied = 0 # how long has the patient been in bed? this changes; reset for new patients
+        self.occupancy_delta = 0 # how long does the patient need to be in bed? this does not change; reset for new patients
+        self.current_patient = None
+        self.allocation_strategy = allocation_strategy
+    
+    def time_occupied_increase(self, time_increment = 1):
+        self.time_occupied += time_increment
+
+    def assign_patient(self, patient):
+        """Assign a patient to this bed."""
+        if self.current_patient:
+            raise ValueError("Attempting to assign patient to an unavailable bed")
+    
+        self.current_patient = patient
+        if self.allocation_strategy == 'FIFO Agent':
+            self.occupancy_delta = 15*(patient.severity**2) / (self.efficiency)
+        else:
+            self.occupancy_delta = 5*(patient.severity**2) / (self.efficiency)
+        
+    def discharge_patient(self):
+        """Discharge the current patient and make bed available."""
+        self.reset()
+
+    def is_occupied(self):
+        return self.current_patient is not None
+
+    def get_features(self):
+        occupancy = self.is_occupied()
+        return [occupancy, self.time_occupied, self.efficiency, self.occupancy_delta]
+
+    def reset(self):
+        """Reset the bed to initial state."""
+        self.current_patient = None
+        self.time_occupied = 0
+        self.occupancy_delta = 5
+
+class HospitalSimulation:
+    """Simulation of hospital bed allocation using different strategies."""
+    
+    def __init__(self, num_beds: int = 24, patient_severities: Dict[int, int] = None, 
+                 window_width=600, window_height=900, allocation_strategy='FIFO Agent'):
         self.num_beds = num_beds
+        self.patient_severities = patient_severities or {}
+        self.window_width = window_width
+        self.window_height = window_height
+        self.allocation_strategy = allocation_strategy
 
         # Queues and references
         self.waiting_queue = deque()
@@ -66,23 +126,20 @@ class HospitalSimulation:
         self.setup_hospital_layout()
 
     def setup_hospital_layout(self):
-        """
-        Define geometry for wings, hallway, waiting area, etc.
-        Then create the bed objects & positions aligned properly.
-        """
+        """Define geometry for wings, hallway, waiting area, etc."""
         self.hallway_height = 140
-        self.hallway_y = WINDOW_HEIGHT // 2 - self.hallway_height // 2
+        self.hallway_y = self.window_height // 2 - self.hallway_height // 2
 
         self.entrance_width = 220
         self.entrance_height = 80
-        self.entrance_x = (WINDOW_WIDTH - self.entrance_width) // 2
-        self.entrance_y = WINDOW_HEIGHT - (self.entrance_height + 20)
+        self.entrance_x = (self.window_width - self.entrance_width) // 2 
+        self.entrance_y = self.window_height - (self.entrance_height + 20)
 
         base_column_spacing = ROOM_SPACING
         self.WARD_COLUMN_SPACING = int(base_column_spacing * 2)
 
         original_wing_block_width = (2 * ROOM_WIDTH) + self.WARD_COLUMN_SPACING + 40
-        wing_block_width = int(original_wing_block_width * 1.5)
+        wing_block_width = int(original_wing_block_width * 1.2)
         wing_block_height = (3 * ROOM_HEIGHT) + (2 * ROOM_SPACING) + 40
 
         self.wing_block_width = wing_block_width
@@ -92,28 +149,28 @@ class HospitalSimulation:
         self.wingA = {
             "name": "Wing A",
             "color": LIGHT_GREEN,
-            "x": (WINDOW_WIDTH // 2) - wing_block_width - 120,
+            "x": (self.window_width // 2) - wing_block_width - 60,
             "y": self.hallway_y - wing_block_height - wing_vertical_offset,
             "beds": 6
         }
         self.wingB = {
             "name": "Wing B",
             "color": LIGHT_BLUE,
-            "x": (WINDOW_WIDTH // 2) + 120,
+            "x": (self.window_width // 2) + 60,
             "y": self.hallway_y - wing_block_height - wing_vertical_offset,
             "beds": 6
         }
         self.wingC = {
             "name": "Wing C",
             "color": LIGHT_ORANGE,
-            "x": (WINDOW_WIDTH // 2) - wing_block_width - 120,
+            "x": (self.window_width // 2) - wing_block_width - 60,
             "y": self.hallway_y + self.hallway_height + wing_vertical_offset,
             "beds": 6
         }
         self.wingD = {
             "name": "Wing D",
             "color": LIGHT_PINK,
-            "x": (WINDOW_WIDTH // 2) + 120,
+            "x": (self.window_width // 2) + 60,
             "y": self.hallway_y + self.hallway_height + wing_vertical_offset,
             "beds": 6
         }
@@ -122,7 +179,7 @@ class HospitalSimulation:
 
         self.waiting_area_width = 320
         self.waiting_area_height = 80
-        self.waiting_area_x = (WINDOW_WIDTH - self.waiting_area_width) // 2
+        self.waiting_area_x = (self.window_width - self.waiting_area_width) // 2
         self.waiting_area_y = self.hallway_y + (self.hallway_height - self.waiting_area_height) // 2
         self.waiting_area_color = (200, 200, 255)
 
@@ -148,13 +205,13 @@ class HospitalSimulation:
             for row in range(3):
                 bx_left = left_x
                 by = start_y + row * (ROOM_HEIGHT + ROOM_SPACING)
-                new_bed = Bed(bed_id)
+                new_bed = Bed(bed_id, efficiency=(row+1)*5, allocation_strategy=self.allocation_strategy)
                 self.beds.append(new_bed)
                 self.bed_positions.append((bx_left + ROOM_WIDTH // 2, by + ROOM_HEIGHT // 2))
                 bed_id += 1
 
                 bx_right = right_x
-                new_bed = Bed(bed_id)
+                new_bed = Bed(bed_id, efficiency = (row+1)*5, allocation_strategy=self.allocation_strategy)
                 self.beds.append(new_bed)
                 self.bed_positions.append((bx_right + ROOM_WIDTH // 2, by + ROOM_HEIGHT // 2))
                 bed_id += 1
@@ -182,17 +239,18 @@ class HospitalSimulation:
         pid = self.next_patient_id
         self.next_patient_id += 1
 
-        p = Patient(pid)
-        p.status = "entering"
+        # Use predefined severity if available
+        severity = self.patient_severities.get(pid, None)
+        p = Patient(pid, severity)
         self.patients[pid] = p
 
-        start_x = WINDOW_WIDTH // 2
-        start_y = WINDOW_HEIGHT + 30
+        start_x = self.window_width // 2
+        start_y = self.window_height + 30
         self.patient_positions[pid] = (start_x, start_y)
 
-        entrance_target_x = WINDOW_WIDTH // 2
+        entrance_target_x = self.window_width // 2
         entrance_target_y = self.entrance_y + self.entrance_height // 2
-        hallway_center_x = WINDOW_WIDTH // 2
+        hallway_center_x = self.window_width // 2
         hallway_center_y = self.hallway_y + self.hallway_height // 2
 
         self.patient_targets[pid] = deque()
@@ -200,6 +258,71 @@ class HospitalSimulation:
         self.patient_targets[pid].append( (hallway_center_x, hallway_center_y) )
 
         self.next_patient_arrival = self.current_time + PATIENT_ARRIVAL_INTERVAL
+
+    def process_optimal_allocation(self):
+        """Optimal allocation strategy assigning highest-severity patients to highest-efficiency beds."""
+        # Get all available beds sorted by efficiency descending
+        available_beds = [bed for bed in self.beds if not bed.is_occupied()]
+        if not available_beds:
+            return
+
+        # Sort available beds by efficiency in descending order
+        available_beds.sort(key=lambda x: x.efficiency, reverse=True)
+
+        # Collect all patients in the waiting queue with their severity
+        patients_in_queue = []
+        for pid in self.waiting_queue:
+            if pid in self.patients:
+                patient = self.patients[pid]
+                patients_in_queue.append((-patient.severity, pid))  # Negative for ascending sort later
+
+        if not patients_in_queue:
+            return
+
+        # Sort patients by severity descending (using negative severity for ascending sort)
+        patients_in_queue.sort()
+        sorted_patient_ids = [pid for (sev, pid) in patients_in_queue]
+
+        # Determine the number of possible assignments
+        num_pairs = min(len(available_beds), len(sorted_patient_ids))
+        if num_pairs == 0:
+            return
+
+        # Extract top patients and beds to assign
+        patients_to_assign = sorted_patient_ids[:num_pairs]
+        beds_to_assign = available_beds[:num_pairs]
+
+        # Remove assigned patients from the waiting queue
+        assigned_set = set(patients_to_assign)
+        new_waiting_queue = deque([pid for pid in self.waiting_queue if pid not in assigned_set])
+        self.waiting_queue = new_waiting_queue
+
+        # Assign each patient to their respective bed
+        for bed, pid in zip(beds_to_assign, patients_to_assign):
+            if pid not in self.patients:
+                continue  # Skip if patient was already removed (unlikely)
+            patient = self.patients[pid]
+            bed.assign_patient(patient)
+            patient.status = "in bed"
+
+            # Update patient movement waypoints
+            bx, by = self.bed_positions[bed.bed_id]
+            wing_index = bed.bed_id // 6
+            wing = self.wings[wing_index]
+            wing_corridor_x = wing['x'] + self.wing_block_width // 2
+            hallway_center_y = self.hallway_y + self.hallway_height // 2
+
+            waypoints = deque()
+            waypoints.append((wing_corridor_x, hallway_center_y))
+            waypoints.append((wing_corridor_x, by))
+            waypoints.append((bx, by))
+
+            self.patient_targets[pid] = waypoints
+
+            self.total_wait_time += patient.wait_time
+
+        # Update waiting positions for remaining patients
+        self.update_waiting_positions()
 
     def process_fifo_allocation(self):
         if not self.waiting_queue:
@@ -211,7 +334,6 @@ class HospitalSimulation:
         patient_id = self.waiting_queue.popleft()
         patient = self.patients[patient_id]
         free_bed.assign_patient(patient)
-        free_bed.calc_occupancy(patient)
         patient.status = "in bed"
 
         bx, by = self.bed_positions[free_bed.bed_id]
@@ -241,8 +363,8 @@ class HospitalSimulation:
                 wing = self.wings[wing_index]
                 wing_corridor_x = wing['x'] + self.wing_block_width //2
                 hallway_center_y = self.hallway_y + self.hallway_height //2
-                exit_x = WINDOW_WIDTH //2
-                exit_y = WINDOW_HEIGHT +60
+                exit_x = self.window_width //2
+                exit_y = self.window_height +60
 
                 waypoints = deque()
                 waypoints.append( (wing_corridor_x, by) )
@@ -317,7 +439,7 @@ class HospitalSimulation:
                 new_y = cy + direction_y * speed
                 self.patient_positions[pid] = (new_x, new_y)
 
-            if patient.status == "discharged" and cy > WINDOW_HEIGHT + 40:
+            if patient.status == "discharged" and cy > self.window_height + 40:
                 to_remove.append(pid)
 
         for pid in to_remove:
@@ -331,13 +453,19 @@ class HospitalSimulation:
             self.create_patient()
         self.update_bed_occupancy(dt)
         self.update_wait_times(dt)
-        self.process_fifo_allocation()
+        
+        # Choose allocation strategy based on parameter
+        if self.allocation_strategy == 'FIFO Agent':
+            self.process_fifo_allocation()
+        else:
+            self.process_optimal_allocation()
+            
         self.process_discharges()
         self.update_patient_positions(dt)
 
     @staticmethod
-    def draw_bed(screen, bed_rect, bed_color, bed_id, bed_id_font, pillow_side="left"):
-        pygame.draw.rect(screen, bed_color, bed_rect, border_radius=8)
+    def draw_bed(surface, bed_rect, bed_color, bed_id, bed_id_font, pillow_side="left"):
+        pygame.draw.rect(surface, bed_color, bed_rect, border_radius=8)
 
         pillow_width = bed_rect.width // 4
         pillow_height = bed_rect.height // 2
@@ -351,53 +479,59 @@ class HospitalSimulation:
             sheet_line_x = bed_rect.x + (bed_rect.width // 3)
 
         pillow_rect = pygame.Rect(pillow_x, pillow_y, pillow_width, pillow_height)
-        pygame.draw.rect(screen, WHITE, pillow_rect, border_radius=4)
+        pygame.draw.rect(surface, WHITE, pillow_rect, border_radius=4)
 
-        pygame.draw.line(screen, (200, 200, 200), (sheet_line_x, bed_rect.y), (sheet_line_x, bed_rect.bottom), width=2)
+        pygame.draw.line(surface, (200, 200, 200), (sheet_line_x, bed_rect.y), (sheet_line_x, bed_rect.bottom), width=2)
 
         id_str = bed_id_font.render(str(bed_id), True, BLACK)
         id_rect = id_str.get_rect(center=bed_rect.center)
-        screen.blit(id_str, id_rect)
+        surface.blit(id_str, id_rect)
 
-    def draw(self, screen):
-        screen.fill((255, 248, 220))
-        font = pygame.font.Font("HankenGrotesk-Italic.ttf", 28)
+    def draw(self, surface):
+        surface.fill((255, 248, 220))
+        font = pygame.font.Font(None, 28)
+
+        # Draw strategy title
+        strategy_font = pygame.font.Font(None, 24)
+        title = strategy_font.render(f"{self.allocation_strategy.upper()} STRATEGY", True, BLACK)
+        title_rect = title.get_rect(center=(self.window_width//2, 20))
+        surface.blit(title, title_rect)
 
         # Calculate the left and right edges of the wings
         left_edge = self.wingA["x"]  # Left edge of Wing A and C
         right_edge = self.wingB["x"] + self.wing_block_width  # Right edge of Wing B and D
         hallway_width = right_edge - left_edge
 
-        pygame.draw.rect(screen, GRAY, (left_edge, self.hallway_y, hallway_width, self.hallway_height))
+        pygame.draw.rect(surface, GRAY, (left_edge, self.hallway_y, hallway_width, self.hallway_height))
 
-        
-        corridor_x = WINDOW_WIDTH//2 - 70
+        corridor_w = 60
+        corridor_x = self.window_width // 2 - corridor_w // 2
         corridor_y = self.hallway_y + self.hallway_height
-        corridor_w = 140
+        
         corridor_h = self.entrance_y - corridor_y
-        pygame.draw.rect(screen, GRAY, (corridor_x, corridor_y, corridor_w, corridor_h))
+        pygame.draw.rect(surface, GRAY, (corridor_x, corridor_y, corridor_w, corridor_h))
 
-        pygame.draw.rect(screen, (220,220,220), (self.entrance_x, self.entrance_y, self.entrance_width, self.entrance_height))
+        pygame.draw.rect(surface, (220,220,220), (self.entrance_x, self.entrance_y, self.entrance_width, self.entrance_height))
         text = font.render("ENTRANCE/EXIT", True, BLACK)
         text_rect = text.get_rect(center=(self.entrance_x + self.entrance_width//2, self.entrance_y + self.entrance_height//2))
-        screen.blit(text, text_rect)
+        surface.blit(text, text_rect)
 
         h_text = font.render("HALLWAY", True, BLACK)
-        h_rect = h_text.get_rect(center=(WINDOW_WIDTH//2, self.hallway_y - 20))
-        screen.blit(h_text, h_rect)
+        h_rect = h_text.get_rect(center=(self.window_width//2, self.hallway_y - 20))
+        surface.blit(h_text, h_rect)
 
-        pygame.draw.rect(screen, self.waiting_area_color, (self.waiting_area_x, self.waiting_area_y, self.waiting_area_width, self.waiting_area_height))
-        small_font = pygame.font.Font("HankenGrotesk-Italic.ttf", 20)
+        pygame.draw.rect(surface, self.waiting_area_color, (self.waiting_area_x, self.waiting_area_y, self.waiting_area_width, self.waiting_area_height))
+        small_font = pygame.font.Font(None, 20)
         wa_text = small_font.render("WAITING AREA", True, BLACK)
         wa_rect = wa_text.get_rect(center=(self.waiting_area_x + self.waiting_area_width//2, self.waiting_area_y + self.waiting_area_height//2))
-        screen.blit(wa_text, wa_rect)
+        surface.blit(wa_text, wa_rect)
 
-        wing_label_font = pygame.font.Font("HankenGrotesk-Italic.ttf", 30)
-        bed_font = pygame.font.Font("HankenGrotesk-Italic.ttf", 24)
+        wing_label_font = pygame.font.Font(None, 30)
+        bed_font = pygame.font.Font(None, 24)
         for wing in self.wings:
             wing_w = self.wing_block_width
             wing_h = (3 * ROOM_HEIGHT) + (2 * ROOM_SPACING) + 40
-            pygame.draw.rect(screen, wing["color"], (wing["x"], wing["y"], wing_w, wing_h))
+            pygame.draw.rect(surface, wing["color"], (wing["x"], wing["y"], wing_w, wing_h))
             
             # Choose text color based on wing name
             if wing["name"] == "Wing A":
@@ -416,7 +550,7 @@ class HospitalSimulation:
             # Center the text both horizontally and vertically in the wing rectangle
             label_x = wing["x"] + wing_w // 2 - label_surf.get_width() // 2
             label_y = wing["y"] + wing_h // 2 - label_surf.get_height() // 2
-            screen.blit(label_surf, (label_x, label_y))
+            surface.blit(label_surf, (label_x, label_y))
         for b, (cx, cy) in zip(self.beds, self.bed_positions):
             color = GREEN if b.is_occupied() else BED_BLUE
 
@@ -424,10 +558,10 @@ class HospitalSimulation:
             y_tl = cy - ROOM_HEIGHT//2
             bed_rect = pygame.Rect(x_tl, y_tl, ROOM_WIDTH, ROOM_HEIGHT)
             pillow_side = "left" if (b.bed_id % 2 == 0) else "right"
-            HospitalSimulation.draw_bed(screen, bed_rect, color, b.bed_id, bed_font, pillow_side)
+            HospitalSimulation.draw_bed(surface, bed_rect, color, b.bed_id, bed_font, pillow_side)
             id_surf = bed_font.render(str(b.bed_id), True, BLACK)
             id_rect = id_surf.get_rect(center=(cx, cy))
-            screen.blit(id_surf, id_rect)
+            surface.blit(id_surf, id_rect)
 
         for pid, (px, py) in self.patient_positions.items():
             patient = self.patients[pid]
@@ -439,28 +573,75 @@ class HospitalSimulation:
                 color = (128,128,128)
             else:
                 color = (100,100,255)
-            pygame.draw.circle(screen, color, (int(px), int(py)), 15)  # Increased radius to 15
+            pygame.draw.circle(surface, color, (int(px), int(py)), 15)  # Increased radius to 15
             id_str = small_font.render(str(pid), True, WHITE)
-            screen.blit(id_str, (px-8, py-8))  # Adjusted text position for the larger circle
-        stats = [
-            f"Time: {self.current_time:.1f}s",
-            f"Waiting: {len(self.waiting_queue)}",
-            f"Treated: {self.total_patients_treated}",
-            f"Avg Wait: {self.total_wait_time/max(1, self.total_patients_treated):.1f}s"
+            surface.blit(id_str, (px-8, py-8))  # Adjusted text position for the larger circle
+        # Left column stats
+        left_stats = [
+            f"Time: {self.current_time:.1f}hrs",
+            f"Waiting: {len(self.waiting_queue)}"
         ]
-        y_offset = 10
-        for line in stats:
+        # Right column stats
+        right_stats = [
+            f"Treated: {self.total_patients_treated}",
+            f"Avg Wait: {self.total_wait_time/max(1, self.total_patients_treated):.1f}hrs"
+        ]
+
+        # Position for both columns
+        x_left = 10
+        x_right = 200
+        y_offset = 40  # Start below the title
+
+        # Draw left column
+        for line in left_stats:
             s_surf = font.render(line, True, BLACK)
-            screen.blit(s_surf, (10, y_offset))
+            surface.blit(s_surf, (x_left, y_offset))
             y_offset += 30
+
+        # Reset y_offset for right column
+        y_offset = 40  
+        # Draw right column
+        for line in right_stats:
+            s_surf = font.render(line, True, BLACK)
+            surface.blit(s_surf, (x_right, y_offset))
+            y_offset += 30
+
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption("Hospital Simulation - FIFO")
+    pygame.display.set_caption("Hospital Simulation - FIFO vs RL")
     clock = pygame.time.Clock()
 
-    sim = HospitalSimulation(num_beds=24)
+    # Pre-generate patient severities for consistent comparison
+    patient_severities = {}
+    for pid in range(1, TOTAL_PATIENTS + 1):
+        random.seed(pid)  # Ensure consistent severities across simulations
+        if random.random() < 0.7:
+            severity = random.randint(1, 5)
+        else:
+            severity = random.randint(6, 10)
+        patient_severities[pid] = severity
+
+    # Create two simulations with identical patient severities but different strategies
+    sim_fifo = HospitalSimulation(
+        num_beds=24,
+        patient_severities=patient_severities,
+        window_width=600,
+        window_height=900,
+        allocation_strategy='FIFO Agent'
+    )
+    sim_optimal = HospitalSimulation(
+        num_beds=24,
+        patient_severities=patient_severities,
+        window_width=600,
+        window_height=900,
+        allocation_strategy='RL Agent'
+    )
+
+    # Surfaces for each simulation
+    left_surface = pygame.Surface((600, 900))
+    right_surface = pygame.Surface((600, 900))
 
     running = True
     while running:
@@ -469,8 +650,23 @@ def main():
             if event.type == pygame.QUIT:
                 running = False
 
-        sim.update(dt)
-        sim.draw(screen)
+        # Update both simulations
+        sim_fifo.update(dt)
+        sim_optimal.update(dt)
+
+        # Draw to surfaces
+        left_surface.fill((255, 248, 220))
+        right_surface.fill((255, 248, 220))
+        sim_fifo.draw(left_surface)
+        sim_optimal.draw(right_surface)
+
+        # Blit to main screen
+        screen.blit(left_surface, (0, 0))
+        screen.blit(right_surface, (600, 0))
+        
+        # Draw divider line
+        pygame.draw.line(screen, BLACK, (600, 0), (600, 900), 2)
+        
         pygame.display.flip()
 
     pygame.quit()
