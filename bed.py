@@ -4,7 +4,7 @@ class Bed:
     def __init__(self, bed_id):
         self.bed_id = bed_id
         self.time_occupied = 0 # how long has the patient been in bed? this changes; reset for new patients
-        self.occupancy_delta = 5 # how long does the patient need to be in bed? this does not change; reset for new patients
+        self.occupancy_delta = 7 # how long does the patient need to be in bed? this does not change; reset for new patients
         self.current_patient = None
     
     def time_occupied_increase(self, time_increment = 1):

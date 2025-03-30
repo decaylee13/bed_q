@@ -2,12 +2,12 @@ from bed import Bed
 from patient import Patient
 class HospitalBedEnv(): 
     def __init__(self, config):
-        self.config = config 
+        self.config = config.get('environment_parameters')
 
         self.curr_time = 0 
         self.curr_episode = 0
         self.episode_steps = 0 
-        self.max_steps = config.get('max_episode_steps', 1000)
+        self.max_steps = self.config.get('max_episode_steps', 1000)
 
         self.patients = {} 
         self.beds = self._initialize_beds(config['beds_config']) #check

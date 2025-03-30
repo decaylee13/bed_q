@@ -74,17 +74,94 @@
     },
     {
       "id": 24
+    },
+    {
+      "id": 25
+    },
+    {
+      "id": 26
+    },
+    {
+      "id": 27
+    },
+    {
+      "id": 28
+    },
+    {
+      "id": 29
+    },
+    {
+      "id": 30
+    },
+    {
+      "id": 31
+    },
+    {
+      "id": 32
+    },
+    {
+      "id": 33
+    },
+    {
+      "id": 34
+    },
+    {
+      "id": 35
+    },
+    {
+      "id": 36
+    },
+    {
+      "id": 37
+    },
+    {
+      "id": 38
+    },
+    {
+      "id": 39
+    },
+    {
+      "id": 40
+    },
+    {
+      "id": 41
+    },
+    {
+      "id": 42
+    },
+    {
+      "id": 43
+    },
+    {
+      "id": 44
+    },
+    {
+      "id": 45
+    },
+    {
+      "id": 46
+    },
+    {
+      "id": 47
+    },
+    {
+      "id": 48
+    },
+    {
+      "id": 49
     }
   ],
-  "max_beds_in_state": 50,
-  "max_episode_steps": 350,
-  "time_step": 1,
-  "base_arrival_rate": 0.3,
-  "wait_penalty_factor": 0.2,
-  "invalid_action_penalty": 5,
-  "patient_feature_dim": 1,
-  "bed_feature_dim": 3,
-  "valid_bed_asnmt": 1,
+  "environment_parameters": {
+    "max_episode_steps": 350,
+    "patient_feature_dim": 1,
+    "max_beds_in_state": 50,
+    "bed_feature_dim": 3,
+    "valid_bed_asnmt": 1,
+    "invalid_action_penalty": 5,
+    "time_step": 1,
+    "base_arrival_rate": 0.3,
+    "wait_penalty_factor": 0.2
+  },
   "learning_parameters": {
     "learning_rate": 0.0001,
     "gamma": 0.95,

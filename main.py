@@ -6,9 +6,7 @@ from environment import HospitalBedEnv
 from q_network import DQNAgent, train_dqn
 
 def visualize_beds(env):
-    """
-    Visualize bed occupancy status with more detailed information.
-    """
+    #Visualizing bed occupancy
     bed_status = []
     occupied_count = 0
     
@@ -127,9 +125,9 @@ def main():
     """
     # Load configuration
     config_path = 'config.json'
-    if not os.path.exists(config_path):
-        print(f"Configuration file {config_path} not found. Creating default config.")
-        create_default_config(config_path)
+    # if not os.path.exists(config_path):
+    #     print(f"Configuration file {config_path} not found. Creating default config.")
+    #     create_default_config(config_path)
     
     with open(config_path, 'r') as f:
         env_config = json.load(f)
@@ -138,12 +136,14 @@ def main():
     
     # Initialize environment
     env = HospitalBedEnv(env_config)
-    
+    learning_param_env = env_config.get('learning_parameters')
     # Get dimensions from environment
     state = env.reset()
     patient_feature_dim = len(state['patient'])
     bed_feature_dim = len(state['beds'][0]) if state['beds'] else 1
-    max_beds = env_config['max_beds_in_state']
+    max_beds = env_config.get('environment_parameters').get('max_beds_in_state')
+    print(f"max_bed: {max_beds}")
+    
     action_dim = len(env.beds) + 1  # +1 for wait action
     
     print(f"State dimensions: Patient features: {patient_feature_dim}, Bed features: {bed_feature_dim}")
@@ -155,13 +155,13 @@ def main():
         bed_feature_dim=bed_feature_dim,
         max_beds=max_beds,
         action_dim=action_dim,
-        learning_rate=env_config.get('learning_parameters').get('learning_rate', 0.001),
-        gamma=env_config.get('learning_parameters').get('gamma', 0.99),
-        epsilon_start=env_config.get('learning_parameters').get('epsilon_start'),
-        epsilon_end=env_config.get('learning_parameters').get('epsilon_end'),
-        epsilon_decay=env_config.get('learning_parameters').get('epsilon_decay'),
-        target_update=env_config.get('learning_parameters').get('target_update', 100),
-        replay_buffer_size=env_config.get('learning_parameters').get('replay_buffer_size')
+        learning_rate=learning_param_env.get('learning_rate', 0.001),
+        gamma=learning_param_env.get('gamma', 0.99),
+        epsilon_start=learning_param_env.get('epsilon_start'),
+        epsilon_end=learning_param_env.get('epsilon_end'),
+        epsilon_decay=learning_param_env.get('epsilon_decay'),
+        target_update=learning_param_env.get('target_update', 100),
+        replay_buffer_size=learning_param_env.get('replay_buffer_size')
     )
     
     # Choose mode (train or verbose)
@@ -173,9 +173,9 @@ def main():
         train_dqn(
             env, 
             agent, 
-            num_episodes=env_config.get('learning_parameters').get('num_episodes'), 
-            max_steps=env_config.get('learning_parameters').get('max_steps'),
-            batch_size=env_config.get('learning_parameters').get('batch_size')
+            num_episodes=learning_param_env.get('num_episodes'), 
+            max_steps=learning_param_env.get('max_steps'),
+            batch_size=learning_param_env.get('batch_size')
         )
     else:
         # Verbose mode
@@ -191,66 +191,6 @@ def main():
             max_steps=max_steps,
             print_interval=print_interval
         )
-
-def create_default_config(config_path):
-    """
-    Create a default configuration file.
-    """
-    default_config = {
-        "beds_config": [
-            {"id": 0},
-            {"id": 1},
-            {"id": 2},
-            {"id": 3},
-            {"id": 4},
-            {"id": 5},
-            {"id": 6},
-            {"id": 7},
-            {"id": 8},
-            {"id": 9},
-            {"id": 10},
-            {"id": 11},
-            {"id": 12},
-            {"id": 13},
-            {"id": 14},
-            {"id": 15},
-            {"id": 16},
-            {"id": 17},
-            {"id": 18},
-            {"id": 19},
-            {"id": 20},
-            {"id": 21},
-            {"id": 22},
-            {"id": 23},
-            {"id": 24}
-        ],
-        "max_beds_in_state": 25,
-        "max_episode_steps": 1000,
-        "time_step": 1,
-        "base_arrival_rate": 0.3,
-        "wait_penalty_factor": 0.2,
-        "invalid_action_penalty": -5,
-        "patient_feature_dim": 1,
-        "bed_feature_dim": 1,
-        
-        "learning_parameters": {
-            "learning_rate": 0.001,
-            "gamma": 0.99,
-            "epsilon_start": 1.0,
-            "epsilon_end": 0.01,
-            "epsilon_decay": 0.995,
-            "target_update": 100,
-            "replay_buffer_size": 50000,
-            "batch_size": 32,
-            "num_episodes": 1000,
-            "max_steps": 1000
-        }
-    }
-    
-    with open(config_path, 'w') as f:
-        json.dump(default_config, f, indent=2)
-    
-    print(f"Created default configuration at {config_path}")
 
 if __name__ == "__main__":
     main()

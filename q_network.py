@@ -5,7 +5,7 @@ import numpy as np
 import random
 from environment import HospitalBedEnv
 import os
-from torch.cuda.amp import autocast, GradScaler
+from torch.amp import autocast, GradScaler
 from collections import deque
 
 # Check if CUDA is available
@@ -24,32 +24,16 @@ class ReplayBuffer:
         self.position = 0
     
     def push(self, state, action, reward, next_state, done):
-        """
-        Add a new transition to the buffer.
-        
-        Args:
-            state: Current state
-            action: Action taken
-            reward: Reward received
-            next_state: Next state
-            done: Whether episode ended
-        """
+        #Adds new state, action, reward, next_state, done into the buffer
         if len(self.buffer) < self.capacity:
             self.buffer.append(None)
         self.buffer[self.position] = (state, action, reward, next_state, done)
         self.position = (self.position + 1) % self.capacity
     
     def sample(self, batch_size):
-        """
-        Sample a batch of transitions randomly.
-        
-        Args:
-            batch_size (int): Number of transitions to sample
-            
-        Returns:
-            tuple: Batch of (states, actions, rewards, next_states, dones)
-        """
+        #Randomly samples batches from the buffer
         batch = random.sample(self.buffer, min(batch_size, len(self.buffer)))
+        #zip transposes the data from the batch into an array of states, actions, etc... 
         states, actions, rewards, next_states, dones = zip(*batch)
         return states, actions, rewards, next_states, dones
     
@@ -58,17 +42,8 @@ class ReplayBuffer:
 
 class DQNetwork(nn.Module):
     def __init__(self, patient_feature_dim, bed_feature_dim, max_beds, action_dim):
-        """
-        Initialize the DQN model.
-        
-        Args:
-            patient_feature_dim (int): Dimension of patient feature vector
-            bed_feature_dim (int): Dimension of single bed feature vector
-            max_beds (int): Maximum number of beds in state
-            action_dim (int): Number of possible actions (wait + assign beds)
-        """
+        #Initializes the Deep_Q Network 
         super(DQNetwork, self).__init__()
-        
         # Calculate total input dimension
         # Patient features + flattened bed features
         self.total_input_dim = patient_feature_dim + (bed_feature_dim * max_beds)
@@ -77,12 +52,21 @@ class DQNetwork(nn.Module):
         self.max_beds = max_beds
         
         # 2-layer network as specified
+        # self.network = nn.Sequential(
+        #     nn.Linear(self.total_input_dim, 128),
+        #     nn.ReLU(),
+        #     nn.Linear(128, 64),
+        #     nn.ReLU(),
+        #     nn.Linear(64, action_dim)  # action_dim = num_beds + 1 (for wait)
+        # )
         self.network = nn.Sequential(
-            nn.Linear(self.total_input_dim, 128),
+            nn.Linear(self.total_input_dim, 256),  
+            nn.ReLU(),
+            nn.Linear(256, 128),  
             nn.ReLU(),
             nn.Linear(128, 64),
             nn.ReLU(),
-            nn.Linear(64, action_dim)  # action_dim = num_beds + 1 (for wait)
+            nn.Linear(64, action_dim)  
         )
     
     def forward(self, state):
@@ -118,15 +102,8 @@ class DQNetwork(nn.Module):
             return self.network(combined)
 
     def process_batch_states(self, states):
-        """
-        Process a batch of states from the replay buffer for training.
-        
-        Args:
-            states: List of state dictionaries
-            
-        Returns:
-            torch.Tensor: Batch of processed states
-        """
+        # Processes a batch of states from replay buffer
+        # Returns torch.Tensor of Batch of processed states
         batch_size = len(states)
         processed_states = torch.zeros(batch_size, self.total_input_dim, device=device)
         
@@ -158,9 +135,8 @@ class DQNAgent:
                  epsilon_decay, 
                  target_update,
                  replay_buffer_size):
+        #Initializes the Deep_Q Network Agent.
         """
-        Initialize the DQN agent.
-        
         Args:
             patient_feature_dim (int): Dimension of patient feature vector
             bed_feature_dim (int): Dimension of single bed feature vector
@@ -201,18 +177,10 @@ class DQNAgent:
         self.steps_done = 0
     
     def select_action(self, state):
-        """
-        Select action using epsilon-greedy policy.
-        
-        Args:
-            state: Current state
-            
-        Returns:
-            int: Selected action
-        """
+        #epsilon-greedy policy for action selection, returns an int for the selected action.
         if random.random() > self.epsilon:
             with torch.no_grad():
-                with autocast():
+                with autocast(device_type='cpu'):
                     # Use policy net to select best action
                     return self.policy_net(state).argmax().item()
         else:
@@ -220,34 +188,20 @@ class DQNAgent:
             return random.randrange(self.action_dim)
     
     def update_epsilon(self):
-        """Decay epsilon value"""
+        #Decaying epsilon value
         self.epsilon = max(self.epsilon_end, self.epsilon * self.epsilon_decay)
     
     def store_transition(self, state, action, reward, next_state, done):
-        """
-        Store transition in replay buffer.
-        
-        Args:
-            state: Current state
-            action: Action taken
-            reward: Reward received
-            next_state: Next state
-            done: Whether episode ended
-        """
+        #Stores transition in the replay buffer. 
         self.replay_buffer.push(state, action, reward, next_state, done)
     
     def update_target_network(self):
-        """Update target network if needed"""
+        #Updates target network
         if self.steps_done % self.target_update == 0:
             self.target_net.load_state_dict(self.policy_net.state_dict())
     
     def save_checkpoint(self, folder='./weights'):
-        """
-        Save model checkpoint.
-        
-        Args:
-            folder (str): Directory to save checkpoint
-        """
+        #Saves model checkpoint
         if not os.path.exists(folder):
             os.makedirs(folder)
         
@@ -279,13 +233,8 @@ class DQNAgent:
         else:
             print(f"No checkpoint found at {filepath}")
     
-    def train(self, batch_size=32):
-        """
-        Train the model with a batch from replay buffer.
-        
-        Args:
-            batch_size (int): Batch size for training
-        """
+    def train(self, batch_size):
+        #Trains the model with a batch from a replay buffer
         # Increment steps
         self.steps_done += 1
         
@@ -295,10 +244,6 @@ class DQNAgent:
         # Check if enough samples in replay buffer
         if len(self.replay_buffer) < batch_size:
             return
-        
-        # This is where you would implement the replay buffer training
-        # Code is commented out as requested, to be manually implemented later
-        
         
         # Sample batch from replay buffer
         states, actions, rewards, next_states, dones = self.replay_buffer.sample(batch_size)
@@ -313,7 +258,7 @@ class DQNAgent:
         done_batch = torch.tensor(dones, dtype=torch.bool, device=device)
         
         # Use AMP for forward pass
-        with autocast():
+        with autocast(device_type='cpu'):
             # Get Q values for chosen actions
             q_values = self.policy_net(state_batch).gather(1, action_batch.unsqueeze(1)).squeeze(1)
             
@@ -340,9 +285,8 @@ class DQNAgent:
             self.save_checkpoint()
 
 def train_dqn(env, agent, num_episodes, max_steps, batch_size=32, checkpoint_interval=5):
+    #Trains Deep_Q Network 
     """
-    Train the DQN agent.
-    
     Args:
         env: Hospital bed environment
         agent: DQN agent
@@ -374,7 +318,7 @@ def train_dqn(env, agent, num_episodes, max_steps, batch_size=32, checkpoint_int
             agent.train(batch_size)  # This would be implemented later
             
             # For now, manually update steps
-            agent.steps_done += 1
+            # agent.steps_done += 1
             
             # Update target network if needed
             agent.update_target_network()
