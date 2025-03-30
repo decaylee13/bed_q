@@ -318,7 +318,6 @@ def train_dqn(env, agent, num_episodes, max_steps, batch_size=32, checkpoint_int
             agent.train(batch_size)  # This would be implemented later
             
             # For now, manually update steps
-            # agent.steps_done += 1
             
             # Update target network if needed
             agent.update_target_network()

@@ -34,30 +34,68 @@ class HospitalBedEnv():
 
         return self.get_state()#check
     
-    def step(self, action):
-        """
-        Process an action and return the next state, reward, and done flag.
-        """
+    # def step(self, action):
+    #     """
+    #     Process an action and return the next state, reward, and done flag.
+    #     """
 
-        # Register model's desired action assignments and also do validation on actions
-        bed_idx = action - 1 
+    #     # Register model's desired action assignments and also do validation on actions
+    #     bed_idx = action - 1 
 
+    #     if action == 0:  
+    #         self._handle_wait_action()
+    #         reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
+
+    #     else:
+    #         if bed_idx < len(self.beds) and not self.beds[bed_idx].is_occupied():
+    #             reward = self.calculate_reward(occupancy=len(self.patients) + 1, action=action, bed_idx=bed_idx)
+    #             self.handle_assignment_action(bed_idx,action) #we set current_patient to None
+    #         else:
+    #             reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
+    #             self.current_patient = None
+
+    #     # Register creation of new events and enact them (patient arrival & discharge)
+    #     self._advance_time()
         
+    #     # Update current patient if needed
+    #     if self.current_patient is None and self.patient_queue:
+    #         self.current_patient = self.patient_queue.pop(0)
+        
+    #     # Check for episode termination
+    #     self.episode_steps += 1
+    #     done = self.episode_steps >= self.max_steps
+        
+    #     # Get new state
+    #     next_state = self.get_state()
+        
+    #     # Gather statistical info
+    #     info = self._get_info()
+        
+    #     return next_state, reward, done, info
+    # In environment.py
 
+    def step(self, action):
+        """Process an action and return the next state, reward, and done flag."""
+        bed_idx = action - 1
+        invalid_action = False
+        
         if action == 0:  
+            # Wait action
             self._handle_wait_action()
             reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
-
         else:
+            # Check if this is a valid bed assignment
             if bed_idx < len(self.beds) and not self.beds[bed_idx].is_occupied():
                 reward = self.calculate_reward(occupancy=len(self.patients) + 1, action=action, bed_idx=bed_idx)
-                self.handle_assignment_action(bed_idx,action) #check
+                self.handle_assignment_action(bed_idx, action)
             else:
+                # Invalid assignment - apply penalty
+                invalid_action = True
                 reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
-
-        # Register creation of new events and enact them (patient arrival & discharge)
-        self._advance_time()
+                self.current_patient = None  # Move to next patient
         
+        # Advance time and process events
+        self._advance_time()
         
         # Update current patient if needed
         if self.current_patient is None and self.patient_queue:
@@ -70,34 +108,54 @@ class HospitalBedEnv():
         # Get new state
         next_state = self.get_state()
         
-        # Gather statistical info
+        # Add information about valid actions to help the agent learn
         info = self._get_info()
+        info['invalid_action'] = invalid_action
         
         return next_state, reward, done, info
     
+    # def get_state(self):
+    #     """
+    #     Returns:
+    #         Dictionary containing patient features and available bed features
+    #     """
+    #     if self.current_patient:
+    #         patient_features = self.current_patient.get_features()
+    #     else:
+    #         # No patient in queue - use zeros
+    #         patient_features = [0] * self.config.get('patient_feature_dim', 5)
+
+    #     # available_beds = [bed for bed in self.beds if not bed.is_occupied()]
+    #     bed_features = [bed.get_features() for bed in self.beds]
+
+    #     #BIG BIG CHECK Pad or truncate bed features to fixed size if needed 
+    #     max_beds = self.config['max_beds_in_state']
+    #     if len(bed_features) < max_beds:
+    #         # Pad with zeros
+    #         pad_feature_dim = self.config.get('bed_feature_dim', 5)
+    #         padding = [[0] * pad_feature_dim for _ in range(max_beds - len(bed_features))]
+    #         bed_features.extend(padding)
+    #     elif len(bed_features) > max_beds:
+    #         # Truncate
+    #         bed_features = bed_features[:max_beds]
+        
+    #     return {
+    #         'patient': patient_features,
+    #         'beds': bed_features
+    #     }
     def get_state(self):
-        """
-        Returns:
-            Dictionary containing patient features and available bed features
-        """
+        # Get current patient features or empty vector if none
         if self.current_patient:
             patient_features = self.current_patient.get_features()
         else:
-            # No patient in queue - use zeros
             patient_features = [0] * self.config.get('patient_feature_dim', 5)
-
-        available_beds = [bed for bed in self.beds if not bed.is_occupied()]
-        bed_features = [bed.get_features() for bed in available_beds]
-
-        #BIG BIG CHECK Pad or truncate bed features to fixed size if needed 
+        
+        # Include ALL beds instead of just unoccupied ones
+        bed_features = [bed.get_features() for bed in self.beds]
+        
+        # Limit to max_beds if needed
         max_beds = self.config['max_beds_in_state']
-        if len(bed_features) < max_beds:
-            # Pad with zeros
-            pad_feature_dim = self.config.get('bed_feature_dim', 5)
-            padding = [[0] * pad_feature_dim for _ in range(max_beds - len(bed_features))]
-            bed_features.extend(padding)
-        elif len(bed_features) > max_beds:
-            # Truncate
+        if len(bed_features) > max_beds:
             bed_features = bed_features[:max_beds]
         
         return {
@@ -121,10 +179,27 @@ class HospitalBedEnv():
     def _initialize_beds(self, beds_config):
         """Initialize bed objects based on configuration."""
         beds = []
-        for i in range(len(beds_config)):
-            eff = (i%10) + 1
-            new_bed = Bed(bed_id=i, efficiency= eff)
+        total_beds = len(beds_config)
+        
+        low_count = int(total_beds * 0.7)
+        medium_count = int(total_beds * 0.2)
+        high_count = total_beds - low_count - medium_count
+
+        for i in range(low_count):
+            eff = 1 + (i%5)
+            new_bed = Bed(bed_id = i, efficiency = eff)
             beds.append(new_bed)
+        
+        for i in range(low_count, low_count + medium_count):
+            eff = 6 + (i % 3)
+            new_bed = Bed(bed_id = i, efficiency = eff)
+            beds.append(new_bed)
+
+        for i in range(low_count + medium_count, total_beds):
+            eff = 9 + (i % 2)
+            new_bed = Bed(bed_id=i, efficiency=eff)
+            beds.append(new_bed)
+        
         return beds
 
 
@@ -259,3 +334,12 @@ class HospitalBedEnv():
         base_rate = self.config.get("base_arrival_rate")
         return base_rate
     
+    def get_valid_actions(self):
+        """Return list of valid actions (0 for wait, 1-50 for unoccupied beds)"""
+        valid_actions = [0]  # Wait is always valid
+        
+        for i, bed in enumerate(self.beds):
+            if not bed.is_occupied():
+                valid_actions.append(i+1)  # +1 because 0 is wait
+        
+        return valid_actions

@@ -18,7 +18,7 @@ class Bed:
             raise ValueError("Attempting to assign patient to an unavailable bed")
     
         self.current_patient = patient
-        self.occupancy_delta = 10 * patient.severity / self.efficiency
+        self.occupancy_delta = 50 * (patient.severity**1.8) / self.efficiency
         
     def discharge_patient(self):
         """Discharge the current patient and make bed available."""
