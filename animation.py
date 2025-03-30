@@ -19,11 +19,15 @@ BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 BLUE = (0, 0, 255)
-LIGHT_BLUE = (173, 216, 230)
+BED_BLUE = (173, 216, 230)
+LIGHT_BLUE = (91, 192, 235)
 LIGHT_GREEN = (144, 238, 144)
 LIGHT_ORANGE = (255, 218, 185)
 LIGHT_PINK = (255, 182, 193)
 GRAY = (169, 169, 169)
+DARK_GREEN = (0, 128, 0)        # Darker shade of LIGHT_GREEN
+DARK_ORANGE = (210, 105, 30)    # Darker shade of LIGHT_ORANGE
+DARK_PINK = (199, 21, 133)      # Darker shade of LIGHT_PINK
 
 # Bed & Layout constants
 ROOM_WIDTH = 60
@@ -33,6 +37,7 @@ ROOM_SPACING = 20
 # Simulation parameters
 PATIENT_ARRIVAL_INTERVAL = 0.6  # seconds
 BASE_MOVE_SPEED = 1000.0        # pixels per second
+TOTAL_PATIENTS = 100
 
 class HospitalSimulation:
     """Simulation of hospital bed allocation using FIFO policy."""
@@ -65,7 +70,7 @@ class HospitalSimulation:
         Define geometry for wings, hallway, waiting area, etc.
         Then create the bed objects & positions aligned properly.
         """
-        self.hallway_height = 100
+        self.hallway_height = 140
         self.hallway_y = WINDOW_HEIGHT // 2 - self.hallway_height // 2
 
         self.entrance_width = 220
@@ -171,6 +176,9 @@ class HospitalSimulation:
         return (x, y)
 
     def create_patient(self):
+        if self.next_patient_id > TOTAL_PATIENTS:
+            return
+        
         pid = self.next_patient_id
         self.next_patient_id += 1
 
@@ -352,14 +360,20 @@ class HospitalSimulation:
         screen.blit(id_str, id_rect)
 
     def draw(self, screen):
-        screen.fill(WHITE)
-        font = pygame.font.Font(None, 28)
+        screen.fill((255, 248, 220))
+        font = pygame.font.Font("HankenGrotesk-Italic.ttf", 28)
 
-        pygame.draw.rect(screen, GRAY, (0, self.hallway_y, WINDOW_WIDTH, self.hallway_height))
+        # Calculate the left and right edges of the wings
+        left_edge = self.wingA["x"]  # Left edge of Wing A and C
+        right_edge = self.wingB["x"] + self.wing_block_width  # Right edge of Wing B and D
+        hallway_width = right_edge - left_edge
+
+        pygame.draw.rect(screen, GRAY, (left_edge, self.hallway_y, hallway_width, self.hallway_height))
+
         
-        corridor_x = WINDOW_WIDTH//2 - 40
+        corridor_x = WINDOW_WIDTH//2 - 70
         corridor_y = self.hallway_y + self.hallway_height
-        corridor_w = 80
+        corridor_w = 140
         corridor_h = self.entrance_y - corridor_y
         pygame.draw.rect(screen, GRAY, (corridor_x, corridor_y, corridor_w, corridor_h))
 
@@ -369,26 +383,43 @@ class HospitalSimulation:
         screen.blit(text, text_rect)
 
         h_text = font.render("HALLWAY", True, BLACK)
-        h_rect = h_text.get_rect(center=(WINDOW_WIDTH//2, self.hallway_y + 20))
+        h_rect = h_text.get_rect(center=(WINDOW_WIDTH//2, self.hallway_y - 20))
         screen.blit(h_text, h_rect)
 
         pygame.draw.rect(screen, self.waiting_area_color, (self.waiting_area_x, self.waiting_area_y, self.waiting_area_width, self.waiting_area_height))
-        small_font = pygame.font.Font(None, 20)
+        small_font = pygame.font.Font("HankenGrotesk-Italic.ttf", 20)
         wa_text = small_font.render("WAITING AREA", True, BLACK)
         wa_rect = wa_text.get_rect(center=(self.waiting_area_x + self.waiting_area_width//2, self.waiting_area_y + self.waiting_area_height//2))
         screen.blit(wa_text, wa_rect)
 
-        wing_label_font = pygame.font.Font(None, 30)
-        bed_font = pygame.font.Font(None, 24)
+        wing_label_font = pygame.font.Font("HankenGrotesk-Italic.ttf", 30)
+        bed_font = pygame.font.Font("HankenGrotesk-Italic.ttf", 24)
         for wing in self.wings:
             wing_w = self.wing_block_width
             wing_h = (3 * ROOM_HEIGHT) + (2 * ROOM_SPACING) + 40
             pygame.draw.rect(screen, wing["color"], (wing["x"], wing["y"], wing_w, wing_h))
-            label_surf = wing_label_font.render(wing["name"], True, BLACK)
-            screen.blit(label_surf, (wing["x"], wing["y"] - 30))
-
+            
+            # Choose text color based on wing name
+            if wing["name"] == "Wing A":
+                text_color = DARK_GREEN
+            elif wing["name"] == "Wing B":
+                text_color = BLUE
+            elif wing["name"] == "Wing C":
+                text_color = DARK_ORANGE
+            elif wing["name"] == "Wing D":
+                text_color = DARK_PINK
+            else:
+                text_color = BLACK
+            
+            label_surf = wing_label_font.render(wing["name"], True, text_color)
+            
+            # Center the text both horizontally and vertically in the wing rectangle
+            label_x = wing["x"] + wing_w // 2 - label_surf.get_width() // 2
+            label_y = wing["y"] + wing_h // 2 - label_surf.get_height() // 2
+            screen.blit(label_surf, (label_x, label_y))
         for b, (cx, cy) in zip(self.beds, self.bed_positions):
-            color = RED if b.is_occupied() else GREEN
+            color = GREEN if b.is_occupied() else BED_BLUE
+
             x_tl = cx - ROOM_WIDTH//2
             y_tl = cy - ROOM_HEIGHT//2
             bed_rect = pygame.Rect(x_tl, y_tl, ROOM_WIDTH, ROOM_HEIGHT)
@@ -408,10 +439,9 @@ class HospitalSimulation:
                 color = (128,128,128)
             else:
                 color = (100,100,255)
-            pygame.draw.circle(screen, color, (int(px), int(py)), 10)
+            pygame.draw.circle(screen, color, (int(px), int(py)), 15)  # Increased radius to 15
             id_str = small_font.render(str(pid), True, WHITE)
-            screen.blit(id_str, (px-5, py-5))
-
+            screen.blit(id_str, (px-8, py-8))  # Adjusted text position for the larger circle
         stats = [
             f"Time: {self.current_time:.1f}s",
             f"Waiting: {len(self.waiting_queue)}",
