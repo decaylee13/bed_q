@@ -318,7 +318,6 @@ def train_dqn(env, agent, num_episodes, max_steps, batch_size=32, checkpoint_int
             agent.train(batch_size)  # This would be implemented later
             
             # For now, manually update steps
-            # agent.steps_done += 1
             
             # Update target network if needed
             agent.update_target_network()
@@ -339,4 +338,3 @@ def train_dqn(env, agent, num_episodes, max_steps, batch_size=32, checkpoint_int
         # Save checkpoint at intervals
         if episode % checkpoint_interval == 0:
             agent.save_checkpoint(folder=f"./weights/episode_{episode}")
-

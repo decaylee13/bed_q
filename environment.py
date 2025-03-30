@@ -42,22 +42,22 @@ class HospitalBedEnv():
         # Register model's desired action assignments and also do validation on actions
         bed_idx = action - 1 
 
-        
-
         if action == 0:  
             self._handle_wait_action()
             reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
 
         else:
-            if bed_idx < len(self.beds) and not self.beds[bed_idx].is_occupied():
+            
+            if (bed_idx < len(self.beds)) and (not self.beds[bed_idx].is_occupied()):
                 reward = self.calculate_reward(occupancy=len(self.patients) + 1, action=action, bed_idx=bed_idx)
                 self.handle_assignment_action(bed_idx,action) #check
             else:
+                # action = 0
                 reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
+                
 
         # Register creation of new events and enact them (patient arrival & discharge)
         self._advance_time()
-        
         
         # Update current patient if needed
         if self.current_patient is None and self.patient_queue:
@@ -87,7 +87,7 @@ class HospitalBedEnv():
             patient_features = [0] * self.config.get('patient_feature_dim', 5)
 
         available_beds = [bed for bed in self.beds if not bed.is_occupied()]
-        bed_features = [bed.get_features() for bed in available_beds]
+        bed_features = [bed.get_features() for bed in self.beds]
 
         #BIG BIG CHECK Pad or truncate bed features to fixed size if needed 
         max_beds = self.config['max_beds_in_state']
@@ -136,12 +136,14 @@ class HospitalBedEnv():
 
     def handle_assignment_action(self, bed_idx, action):
         """Process a bed assignment action."""
+
         if action != 0:
             bed = self.beds[bed_idx]
             self.patients[self.current_patient.id] = self.current_patient # reference the patient's existing ID
             bed.assign_patient(self.current_patient)
             # Clear current patient to get next one
             self.current_patient = None
+
     
     def calculate_reward(self, occupancy, action, bed_idx): 
         """
@@ -212,6 +214,7 @@ class HospitalBedEnv():
                     'bed_id': bed.bed_id,
                     'time': self.curr_time
                 })
+
         # print(events)
         for event in events:
             if event['type'] == 'patient_arrival':
