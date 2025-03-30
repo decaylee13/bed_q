@@ -77,24 +77,24 @@
     }
   ],
   "max_beds_in_state": 25,
-  "max_episode_steps": 1000,
+  "max_episode_steps": 75,
   "time_step": 1,
   "base_arrival_rate": 0.3,
   "wait_penalty_factor": 0.2,
-  "invalid_action_penalty": 30,
+  "invalid_action_penalty": 2,
   "patient_feature_dim": 1,
-  "bed_feature_dim": 1,
-  "valid_bed_asnmt": 3,
+  "bed_feature_dim": 3,
+  "valid_bed_asnmt": 1,
   "learning_parameters": {
-    "learning_rate": 0.001,
-    "gamma": 0.99,
+    "learning_rate": 0.0001,
+    "gamma": 0.8,
     "epsilon_start": 1.0,
     "epsilon_end": 0.01,
-    "epsilon_decay": 0.995,
-    "target_update": 100,
+    "epsilon_decay": 0.991,
+    "target_update": 300,
     "replay_buffer_size": 50000,
     "batch_size": 32,
-    "num_episodes": 1000,
-    "max_steps": 1000
+    "num_episodes": 100,
+    "max_steps": 75
   }
 }

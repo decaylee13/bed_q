@@ -151,13 +151,13 @@ class DQNAgent:
                  bed_feature_dim, 
                  max_beds, 
                  action_dim,
-                 learning_rate=0.001, 
-                 gamma=0.99, 
-                 epsilon_start=1.0, 
-                 epsilon_end=0.01, 
-                 epsilon_decay=0.995, 
-                 target_update=100,
-                 replay_buffer_size=50000):
+                 learning_rate, 
+                 gamma, 
+                 epsilon_start, 
+                 epsilon_end, 
+                 epsilon_decay, 
+                 target_update,
+                 replay_buffer_size):
         """
         Initialize the DQN agent.
         
@@ -299,7 +299,7 @@ class DQNAgent:
         # This is where you would implement the replay buffer training
         # Code is commented out as requested, to be manually implemented later
         
-        """
+        
         # Sample batch from replay buffer
         states, actions, rewards, next_states, dones = self.replay_buffer.sample(batch_size)
         
@@ -330,7 +330,7 @@ class DQNAgent:
         self.scaler.scale(loss).backward()
         self.scaler.step(self.optimizer)
         self.scaler.update()
-        """
+        
         
         # Update epsilon
         self.update_epsilon()
@@ -339,7 +339,7 @@ class DQNAgent:
         if self.steps_done % 1000 == 0:
             self.save_checkpoint()
 
-def train_dqn(env, agent, num_episodes=1000, max_steps=1000, batch_size=32, checkpoint_interval=5):
+def train_dqn(env, agent, num_episodes, max_steps, batch_size=32, checkpoint_interval=5):
     """
     Train the DQN agent.
     

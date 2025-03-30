@@ -34,15 +34,7 @@ def visualize_state(state):
     Returns a string representation of the state.
     """
     patient_info = f"Patient features: {state['patient']}"
-    beds_info = "Available beds: ["
-    
-    for i, bed in enumerate(state['beds']):
-        if i > 0:
-            beds_info += ", "
-        beds_info += str(bed)
-    beds_info += "]"
-
-    return f"{patient_info}\n{beds_info}"
+    return f"{patient_info}\n"
 
 def print_environment_info(env):
     """
@@ -163,13 +155,13 @@ def main():
         bed_feature_dim=bed_feature_dim,
         max_beds=max_beds,
         action_dim=action_dim,
-        learning_rate=env_config.get('learning_rate', 0.001),
-        gamma=env_config.get('gamma', 0.99),
-        epsilon_start=env_config.get('epsilon_start', 1.0),
-        epsilon_end=env_config.get('epsilon_end', 0.01),
-        epsilon_decay=env_config.get('epsilon_decay', 0.995),
-        target_update=env_config.get('target_update', 100),
-        replay_buffer_size=env_config.get('replay_buffer_size', 50000)
+        learning_rate=env_config.get('learning_parameters').get('learning_rate', 0.001),
+        gamma=env_config.get('learning_parameters').get('gamma', 0.99),
+        epsilon_start=env_config.get('learning_parameters').get('epsilon_start'),
+        epsilon_end=env_config.get('learning_parameters').get('epsilon_end'),
+        epsilon_decay=env_config.get('learning_parameters').get('epsilon_decay'),
+        target_update=env_config.get('learning_parameters').get('target_update', 100),
+        replay_buffer_size=env_config.get('learning_parameters').get('replay_buffer_size')
     )
     
     # Choose mode (train or verbose)
@@ -181,9 +173,9 @@ def main():
         train_dqn(
             env, 
             agent, 
-            num_episodes=env_config.get('num_episodes', 1000), 
-            max_steps=env_config.get('max_steps', 1000),
-            batch_size=env_config.get('batch_size', 32)
+            num_episodes=env_config.get('learning_parameters').get('num_episodes'), 
+            max_steps=env_config.get('learning_parameters').get('max_steps'),
+            batch_size=env_config.get('learning_parameters').get('batch_size')
         )
     else:
         # Verbose mode

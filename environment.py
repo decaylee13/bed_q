@@ -41,21 +41,24 @@ class HospitalBedEnv():
 
         # Register model's desired action assignments and also do validation on actions
         bed_idx = action - 1 
+
+        
+
         if action == 0:  
             self._handle_wait_action()
+            reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
+
         else:
             if bed_idx < len(self.beds) and not self.beds[bed_idx].is_occupied():
+                reward = self.calculate_reward(occupancy=len(self.patients) + 1, action=action, bed_idx=bed_idx)
                 self.handle_assignment_action(bed_idx,action) #check
             else:
-                print("No beds are available/Bed id is invalid")
+                reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
 
         # Register creation of new events and enact them (patient arrival & discharge)
         self._advance_time()
         
-        # Update rewards
-        print("Current occupancy count:",len(self.patients))
-        reward = self.calculate_reward(occupancy=len(self.patients), action=action, bed_idx=bed_idx)
-
+        
         # Update current patient if needed
         if self.current_patient is None and self.patient_queue:
             self.current_patient = self.patient_queue.pop(0)
@@ -146,31 +149,25 @@ class HospitalBedEnv():
         """
         reward = 0 
 
-        if action!=0:
-            print("is the bed of the desired action occupied?")
+        # if action!=0:
+        #     print("is the bed of the desired action occupied?")
             # print("bed_idx's patient (if any)",self.beds[bed_idx].current_patient)
             # print(not (self.beds[bed_idx].is_occupied()))
-            if self.beds[bed_idx].current_patient != None:
-                print("Occupied")
-                print(self.beds[bed_idx].current_patient)
-            else:
-                print("Nobody")
-                print(self.beds[bed_idx].current_patient)
     
         if action == 0: 
             # if making a patient wait
-            reward -= self.config.get('wait_penalty_factor', 0.1) 
+            reward -= self.config.get('wait_penalty_factor') 
 
         elif bed_idx < self.config.get('max_beds_in_state') and not self.beds[bed_idx].is_occupied():
             # if a valid action
-            reward += self.config.get('valid_bed_assnmt')
+            reward += self.config.get('valid_bed_asnmt')
 
             # update the occupancy reward
-            reward += (occupancy / self.config('max_beds_in_state')) * 10
+            reward += (occupancy / self.config.get('max_beds_in_state')) * 10
         else:
             # Discourage it from doing illegal actions
             reward -= self.config.get('invalid_action_penalty')
-            print("Incurred invalid action reward",self.curr_time)
+            # print("Incurred invalid action reward",self.curr_time)
         
         
         return reward
@@ -205,13 +202,17 @@ class HospitalBedEnv():
 
         # Check for bed discharges
         for bed in self.beds:
+
+            if bed.is_occupied():
+                bed.time_occupied_increase()
+
             if bed.is_occupied() and bed.time_occupied >= bed.occupancy_delta:
                 events.append({
                     'type': 'bed_discharge',
                     'bed_id': bed.bed_id,
                     'time': self.curr_time
                 })
-        
+        # print(events)
         for event in events:
             if event['type'] == 'patient_arrival':
                 # new_patient = Patient.generate_random(self.current_time, self.config)
@@ -222,8 +223,11 @@ class HospitalBedEnv():
 
                 # store deletion id because otherwise cannot reference patient because already gone
                 deletion_id = self.beds[bed_id].current_patient.id
+                # print(f"before: {[target.is_occupied() for target in self.beds]}")
                 self.beds[bed_id].discharge_patient()
                 del self.patients[deletion_id]
+                # print(f"after: {[target.is_occupied() for target in self.beds]}")
+                
 
     def _get_arrival_rate(self, time):
         """

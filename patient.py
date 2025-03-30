@@ -11,7 +11,5 @@ class Patient:
         self.wait_time += time_increment
 
     def get_features(self):
-
         # Later on should include patient feature vector so the model can consider who is waiting for a bed and strategize with that and pure wait time
-        
         return [self.wait_time]
