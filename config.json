@@ -1,0 +1,100 @@
+{
+  "beds_config": [
+    {
+      "id": 0
+    },
+    {
+      "id": 1
+    },
+    {
+      "id": 2
+    },
+    {
+      "id": 3
+    },
+    {
+      "id": 4
+    },
+    {
+      "id": 5
+    },
+    {
+      "id": 6
+    },
+    {
+      "id": 7
+    },
+    {
+      "id": 8
+    },
+    {
+      "id": 9
+    },
+    {
+      "id": 10
+    },
+    {
+      "id": 11
+    },
+    {
+      "id": 12
+    },
+    {
+      "id": 13
+    },
+    {
+      "id": 14
+    },
+    {
+      "id": 15
+    },
+    {
+      "id": 16
+    },
+    {
+      "id": 17
+    },
+    {
+      "id": 18
+    },
+    {
+      "id": 19
+    },
+    {
+      "id": 20
+    },
+    {
+      "id": 21
+    },
+    {
+      "id": 22
+    },
+    {
+      "id": 23
+    },
+    {
+      "id": 24
+    }
+  ],
+  "max_beds_in_state": 25,
+  "max_episode_steps": 1000,
+  "time_step": 1,
+  "base_arrival_rate": 0.3,
+  "wait_penalty_factor": 0.2,
+  "invalid_action_penalty": 30,
+  "patient_feature_dim": 1,
+  "bed_feature_dim": 1,
+  "valid_bed_asnmt": 3,
+  "learning_parameters": {
+    "learning_rate": 0.001,
+    "gamma": 0.99,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.01,
+    "epsilon_decay": 0.995,
+    "target_update": 100,
+    "replay_buffer_size": 50000,
+    "batch_size": 32,
+    "num_episodes": 1000,
+    "max_steps": 1000
+  }
+}
